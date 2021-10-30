@@ -9,7 +9,7 @@ Add your API keys to PATH:
 Pass keys as parameters for DataProvider's constructor: </br>
 DataProvider                </br>
 (                           </br>
-HTTPClient( << key >> ),    </br>
+HTTPClient(),               </br>
 GraphHopper( << key >> ),   </br>
 OpenTripMap( << key >> ),   </br>
 OpenWeatherMap( << key >> ) </br>
