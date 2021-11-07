@@ -6,10 +6,10 @@ Add your API keys to environment variables:
 - OPEN_WEATHER_KEY
 
 # Or
-Pass keys as parameters for DataProvider's constructor:
+Pass keys as parameters for DataProvider's constructor: </br>
 DataProvider                </br>
 (                           </br>
-HTTPClient( << key >> ),    </br>
+HTTPClient(),               </br>
 GraphHopper( << key >> ),   </br>
 OpenTripMap( << key >> ),   </br>
 OpenWeatherMap( << key >> ) </br>
