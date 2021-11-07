@@ -19,9 +19,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import model.Hit
+import model.OpenTripMapPlacesModelItem
 
 const val DEFAULT_WIDTH = 800
 const val DEFAULT_HEIGHT = 600
@@ -38,13 +38,13 @@ class Application(
         size = IntSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     ) {
         val places = mutableStateListOf<Hit>()
-        val placesWithDescription = remember { mutableStateListOf<Pair<String, String>>() }
+        val placesAround = remember { mutableStateListOf<OpenTripMapPlacesModelItem>() }
         val weather = remember { mutableStateOf("") }
 
         MaterialTheme {
             Column(Modifier.fillMaxSize()) {
-                SearchView(places, placesWithDescription, weather)
-                Content(places, placesWithDescription, weather)
+                SearchView(places, weather, placesAround)
+                Content(places, weather, placesAround)
             }
         }
     }
@@ -52,8 +52,8 @@ class Application(
     @Composable
     private fun SearchView(
         places: SnapshotStateList<Hit>,
-        placesWithDescription: SnapshotStateList<Pair<String, String>>,
-        weather: MutableState<String>
+        weather: MutableState<String>,
+        placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>
     ) {
         val buttonText = "Go!"
         var inputText by remember { mutableStateOf("") }
@@ -90,7 +90,7 @@ class Application(
                         try {
                             weather.value = ""
                             places.clear()
-                            placesWithDescription.clear()
+                            placesAround.clear()
                             places.addAll(provider.requestPlaces(inputText))
                         } catch (th: Throwable) {
                             isError = true
@@ -117,13 +117,13 @@ class Application(
     }
 
     @Composable
-    fun Content(
+    private fun Content(
         places: SnapshotStateList<Hit>,
-        placesWithDescription: SnapshotStateList<Pair<String, String>>,
-        weather: MutableState<String>
+        weather: MutableState<String>,
+        placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>
     ) {
         Row {
-            SearchResults(places, weather, placesWithDescription)
+            SearchResults(places, weather, placesAround)
             Column {
                 Row(
                     horizontalArrangement = Arrangement.Center,
@@ -136,18 +136,19 @@ class Application(
                         modifier = Modifier.padding(5.dp)
                     )
                 }
-                PlacesWithDescription(placesWithDescription)
+                //places and descriptions
+                PlacesWithDescription(placesAround)
             }
         }
     }
 
     @Composable
-    fun PlacesWithDescription(content: SnapshotStateList<Pair<String, String>>) {
+    private fun PlacesWithDescription(placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>) {
         LazyColumn(
             modifier = Modifier.fillMaxSize()
         ) {
             items(
-                items = content,
+                items = placesAround,
                 itemContent = {
                     ItemPlaceWithDescription(it)
                 }
@@ -156,68 +157,80 @@ class Application(
     }
 
     @Composable
-    fun ItemPlaceWithDescription(item: Pair<String, String>) {
+    private fun ItemPlaceWithDescription(place: OpenTripMapPlacesModelItem) {
         Column {
+            val placeName = remember { place.name }
+            val description = remember { mutableStateOf("") }
+            val isButtonVisible = remember { mutableStateOf(true) }
             Text(
-                text = item.first,
+                text = placeName.ifBlank { "Place without name" },
                 style = MaterialTheme.typography.h6
             )
             Text(
-                text = item.second,
+                text = description.value,
                 style = MaterialTheme.typography.caption
             )
+            Button(
+                onClick = {
+                    scope.launch {
+                        description.value = provider.requestDescription(place)
+                        isButtonVisible.value = false
+                    }
+                },
+                enabled = isButtonVisible.value
+            ) {
+                Text("Get description")
+            }
         }
     }
 
     @Composable
-    fun SearchResults(
+    private fun SearchResults(
         places: SnapshotStateList<Hit>,
         weather: MutableState<String>,
-        placesWithDescription: SnapshotStateList<Pair<String, String>>
+        placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(0.3F).fillMaxHeight(),
             content = {
-                PlacesContent(places, weather, placesWithDescription)
+                PlacesContent(places, weather, placesAround)
             }
         )
     }
 
     @Composable
-    fun PlacesContent(
+    private fun PlacesContent(
         places: SnapshotStateList<Hit>,
         weather: MutableState<String>,
-        placesWithDescription: SnapshotStateList<Pair<String, String>>
+        placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>
     ) {
         LazyColumn {
             items(
                 items = places,
                 itemContent = {
-                    ItemPlace(it, weather, placesWithDescription)
+                    ItemPlace(it, weather, placesAround)
                 }
             )
         }
     }
 
     @Composable
-    fun ItemPlace(
+    private fun ItemPlace(
         place: Hit,
         weather: MutableState<String>,
-        placesWithDescription: SnapshotStateList<Pair<String, String>>
+        placesAround: SnapshotStateList<OpenTripMapPlacesModelItem>
     ) {
         Card(
             modifier = Modifier.padding(horizontal = 3.dp, vertical = 3.dp)
                 .fillMaxWidth()
                 .clickable {
                     weather.value = ""
-                    placesWithDescription.clear()
                     scope.launch { weather.value = provider.requestTemp(place.point.point()) }
                     scope.launch {
-                        provider.requestPlacesWithDescription(place.point.point())
-                            .collect {
-                                placesWithDescription.add(it)
-                                logger.info("COLLECTOR: $it")
-                            }
+                        placesAround.clear()
+                        placesAround.addAll(
+                            provider.requestPlacesByRadius(place.point.point())
+                        )
                     }
                     logger.info("WEATHER AND PLACES LAUNCHED")
                 },
