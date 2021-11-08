@@ -1,3 +1,5 @@
+# About
+Simple project for viewing interesting places around
 # How to?
 
 Add your API keys to environment variables:
